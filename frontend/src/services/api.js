@@ -1,7 +1,9 @@
 import axios from 'axios';
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
+
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: API_BASE_URL,
   headers: { 'Content-Type': 'application/json' },
 });
 
@@ -125,11 +127,11 @@ export const billingAPI = {
   getById: (id) => api.get(`/billing/product/${id}`),
   getPdfUrl: (id, format = 'a4') => {
     const token = localStorage.getItem('token') || '';
-    return `/api/billing/product/${id}/pdf?token=${token}&format=${format}`;
+    return `${API_BASE_URL}/billing/product/${id}/pdf?token=${token}&format=${format}`;
   },
   downloadPdf: (id, invoiceNumber = 'Invoice', format = 'a4') => {
     const token = localStorage.getItem('token') || '';
-    const url = `/api/billing/product/${id}/pdf?token=${token}&format=${format}`;
+    const url = `${API_BASE_URL}/billing/product/${id}/pdf?token=${token}&format=${format}`;
     const link = document.createElement('a');
     link.href = url;
     link.target = '_blank';
@@ -140,7 +142,7 @@ export const billingAPI = {
   },
   printPdf: (id, format = 'a4') => {
     const token = localStorage.getItem('token') || '';
-    const url = `/api/billing/product/${id}/pdf?token=${token}&disposition=inline&format=${format}`;
+    const url = `${API_BASE_URL}/billing/product/${id}/pdf?token=${token}&disposition=inline&format=${format}`;
     const win = window.open(url, '_blank');
     if (win) {
       win.focus();
