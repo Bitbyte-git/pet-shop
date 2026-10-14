@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { billingAPI } from '../../services/api';
+import { billingAPI, inventoryAPI } from '../../services/api';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import { formatCurrency, formatDate } from '../../utils/helpers';
 import SalesTrendChart from '../../components/charts/SalesTrendChart';
 import {
   ChartBarIcon, CalendarIcon, FunnelIcon, ArrowDownTrayIcon,
   ShoppingBagIcon, BeakerIcon, CurrencyRupeeIcon, DocumentTextIcon,
+  ExclamationTriangleIcon, ClockIcon, CubeIcon,
 } from '@heroicons/react/24/outline';
 
 export default function ReportsPage() {
@@ -21,18 +22,36 @@ export default function ReportsPage() {
   const [billType, setBillType] = useState('ALL');
   const [paymentStatus, setPaymentStatus] = useState('ALL');
   const [paymentMethod, setPaymentMethod] = useState('ALL');
+  const [inventoryData, setInventoryData] = useState({
+    lowStock: [],
+    outOfStock: [],
+    expiringSoon: [],
+    expired: [],
+  });
 
   useEffect(() => {
     setLoading(true);
-    billingAPI.getHistory({ 
-      startDate, 
-      endDate, 
-      billType: billType === 'ALL' ? undefined : billType,
-      paymentStatus: paymentStatus === 'ALL' ? undefined : paymentStatus,
-      paymentMethod: paymentMethod === 'ALL' ? undefined : paymentMethod,
-      limit: 500 
-    })
-      .then((r) => setBills(r.data.bills || []))
+    Promise.all([
+      billingAPI.getHistory({ 
+        startDate, 
+        endDate, 
+        billType: billType === 'ALL' ? undefined : billType,
+        paymentStatus: paymentStatus === 'ALL' ? undefined : paymentStatus,
+        paymentMethod: paymentMethod === 'ALL' ? undefined : paymentMethod,
+        limit: 500 
+      }),
+      inventoryAPI.getLowStock(),
+      inventoryAPI.getExpiry(90),
+    ])
+      .then(([billingRes, lowStockRes, expiringRes]) => {
+        setBills(billingRes.data.bills || []);
+        const allProducts = [...(lowStockRes.data?.products || []), ...(expiringRes.data?.products || [])];
+        const lowStock = allProducts.filter(p => p.currentStock <= p.reorderLevel && p.currentStock > 0);
+        const outOfStock = allProducts.filter(p => p.currentStock === 0);
+        const expiringSoon = allProducts.filter(p => p.expiryDate && new Date(p.expiryDate) <= new Date(Date.now() + 90 * 24 * 60 * 60 * 1000) && new Date(p.expiryDate) >= new Date());
+        const expired = allProducts.filter(p => p.expiryDate && new Date(p.expiryDate) < new Date());
+        setInventoryData({ lowStock, outOfStock, expiringSoon, expired });
+      })
       .finally(() => setLoading(false));
   }, [startDate, endDate, billType, paymentStatus, paymentMethod]);
 
@@ -350,6 +369,112 @@ export default function ReportsPage() {
                 <div className="flex justify-between items-center">
                   <span className="text-slate-600">Number of Bills</span>
                   <span className="font-bold text-slate-800">{clinicStats.totalBills}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Inventory Alerts Section */}
+          <div className="card">
+            <div className="card-header">
+              <h3 className="font-semibold text-slate-800 flex items-center gap-2">
+                <CubeIcon className="h-5 w-5 text-primary-600" />
+                Inventory Alerts (Critical for Management)
+              </h3>
+            </div>
+            <div className="card-body">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Low Stock */}
+                <div className="space-y-3">
+                  <h4 className="text-sm font-semibold text-yellow-700 flex items-center gap-2">
+                    <ExclamationTriangleIcon className="h-4 w-4" />
+                    Low Stock ({inventoryData.lowStock.length})
+                  </h4>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {inventoryData.lowStock.length === 0 ? (
+                      <p className="text-xs text-green-600 font-medium">✓ All products have sufficient stock</p>
+                    ) : inventoryData.lowStock.slice(0, 5).map((p) => (
+                      <div key={p._id} className="flex items-center justify-between p-2 bg-yellow-50 rounded-lg">
+                        <div>
+                          <p className="text-sm font-medium text-slate-800">{p.name}</p>
+                          <p className="text-xs text-slate-500 font-mono">{p.productCode}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-bold text-yellow-700">{p.currentStock} left</p>
+                          <p className="text-xs text-slate-500">Reorder: {p.reorderLevel}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Out of Stock */}
+                <div className="space-y-3">
+                  <h4 className="text-sm font-semibold text-red-700 flex items-center gap-2">
+                    <ExclamationTriangleIcon className="h-4 w-4" />
+                    Out of Stock ({inventoryData.outOfStock.length})
+                  </h4>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {inventoryData.outOfStock.length === 0 ? (
+                      <p className="text-xs text-green-600 font-medium">✓ No products out of stock</p>
+                    ) : inventoryData.outOfStock.slice(0, 5).map((p) => (
+                      <div key={p._id} className="flex items-center justify-between p-2 bg-red-50 rounded-lg">
+                        <div>
+                          <p className="text-sm font-medium text-slate-800">{p.name}</p>
+                          <p className="text-xs text-slate-500 font-mono">{p.productCode}</p>
+                        </div>
+                        <span className="badge badge-red">0 in stock</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Expiring Soon */}
+                <div className="space-y-3">
+                  <h4 className="text-sm font-semibold text-orange-700 flex items-center gap-2">
+                    <ClockIcon className="h-4 w-4" />
+                    Expiring Soon ({inventoryData.expiringSoon.length})
+                  </h4>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {inventoryData.expiringSoon.length === 0 ? (
+                      <p className="text-xs text-slate-500">No products expiring in next 90 days</p>
+                    ) : inventoryData.expiringSoon.slice(0, 5).map((p) => (
+                      <div key={p._id} className="flex items-center justify-between p-2 bg-orange-50 rounded-lg">
+                        <div>
+                          <p className="text-sm font-medium text-slate-800">{p.name}</p>
+                          <p className="text-xs text-slate-500 font-mono">{p.productCode}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-bold text-orange-700">{p.daysUntilExpiry} days</p>
+                          <p className="text-xs text-slate-500">Stock: {p.currentStock}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Expired */}
+                <div className="space-y-3">
+                  <h4 className="text-sm font-semibold text-red-700 flex items-center gap-2">
+                    <ClockIcon className="h-4 w-4" />
+                    Expired ({inventoryData.expired.length})
+                  </h4>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {inventoryData.expired.length === 0 ? (
+                      <p className="text-xs text-green-600 font-medium">✓ No expired products</p>
+                    ) : inventoryData.expired.slice(0, 5).map((p) => (
+                      <div key={p._id} className="flex items-center justify-between p-2 bg-red-50 rounded-lg">
+                        <div>
+                          <p className="text-sm font-medium text-slate-800">{p.name}</p>
+                          <p className="text-xs text-slate-500 font-mono">{p.productCode}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-bold text-red-700">{p.daysExpired} days ago</p>
+                          <p className="text-xs text-slate-500">Stock: {p.currentStock}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>

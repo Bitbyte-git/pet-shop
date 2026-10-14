@@ -25,7 +25,7 @@ export default function BillingManagerDashboard() {
   if (loading) return <LoadingSpinner />;
   if (!data) return null;
 
-  const { stats, recentBills, lowStockAlerts, expiringProducts, recentTransactions, salesAnalytics, analytics } = data;
+  const { stats, recentBills, lowStockAlerts, outOfStockAlerts, expiringProducts, expiredProducts, recentTransactions, salesAnalytics, analytics } = data;
   
   // Ensure analytics exists with defaults
   const analyticsData = analytics || {
@@ -205,45 +205,104 @@ export default function BillingManagerDashboard() {
           </div>
         </div>
 
-        {/* Stock Alerts & Expiring Products */}
-        <div className="space-y-4">
-          <div className="card">
-            <div className="card-header flex justify-between items-center">
-              <h3 className="font-semibold text-slate-800">⚠️ Low Stock Alerts</h3>
-              <Link to="/billing/inventory" className="text-xs text-primary-600 hover:underline font-medium">Manage Inventory</Link>
-            </div>
-            <div className="divide-y divide-slate-100">
-              {lowStockAlerts?.length === 0 ? (
-                <p className="text-xs text-green-600 text-center py-6 font-medium">✓ All products have sufficient stock</p>
-              ) : lowStockAlerts?.map((p) => (
-                <div key={p._id} className="flex items-center justify-between px-6 py-2.5 text-sm">
-                  <div>
-                    <p className="font-medium text-slate-800">{p.name}</p>
-                    <p className="text-xs text-slate-400 font-mono">{p.productCode}</p>
-                  </div>
-                  <span className="badge badge-yellow">{p.currentStock} remaining</span>
-                </div>
-              ))}
-            </div>
+        {/* Inventory Alerts */}
+        <div className="card">
+          <div className="card-header flex justify-between items-center">
+            <h3 className="font-semibold text-slate-800">📦 Inventory Alerts</h3>
+            <Link to="/billing/inventory" className="text-xs text-primary-600 hover:underline font-medium">Manage Inventory</Link>
           </div>
-
-          <div className="card">
-            <div className="card-header flex justify-between items-center">
-              <h3 className="font-semibold text-slate-800">⏰ Expiring Products Tracking</h3>
-              <Link to="/billing/products" className="text-xs text-primary-600 hover:underline font-medium">View Products</Link>
-            </div>
-            <div className="divide-y divide-slate-100">
-              {expiringProducts?.length === 0 ? (
-                <p className="text-xs text-slate-500 text-center py-6">No products expiring in next 90 days</p>
-              ) : expiringProducts?.map((p) => (
-                <div key={p._id} className="flex items-center justify-between px-6 py-2.5 text-sm">
-                  <div>
-                    <p className="font-medium text-slate-800">{p.name}</p>
-                    <p className="text-xs text-slate-400 font-mono">{p.productCode}</p>
+          <div className="space-y-4 p-6">
+            {/* Low Stock */}
+            <div>
+              <h4 className="text-sm font-semibold text-yellow-700 mb-2 flex items-center gap-2">
+                <ExclamationTriangleIcon className="h-4 w-4" />
+                Low Stock ({lowStockAlerts?.length || 0})
+              </h4>
+              <div className="space-y-2">
+                {lowStockAlerts?.length === 0 ? (
+                  <p className="text-xs text-green-600 font-medium">✓ All products have sufficient stock</p>
+                ) : lowStockAlerts?.slice(0, 5).map((p) => (
+                  <div key={p._id} className="flex items-center justify-between p-2 bg-yellow-50 rounded-lg">
+                    <div>
+                      <p className="text-sm font-medium text-slate-800">{p.name}</p>
+                      <p className="text-xs text-slate-500 font-mono">{p.productCode}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-bold text-yellow-700">{p.currentStock} left</p>
+                      <p className="text-xs text-slate-500">Reorder at: {p.reorderLevel}</p>
+                    </div>
                   </div>
-                  <span className="badge badge-red">{p.daysUntilExpiry} days left</span>
-                </div>
-              ))}
+                ))}
+              </div>
+            </div>
+
+            {/* Out of Stock */}
+            <div>
+              <h4 className="text-sm font-semibold text-red-700 mb-2 flex items-center gap-2">
+                <ExclamationTriangleIcon className="h-4 w-4" />
+                Out of Stock ({outOfStockAlerts?.length || 0})
+              </h4>
+              <div className="space-y-2">
+                {outOfStockAlerts?.length === 0 ? (
+                  <p className="text-xs text-green-600 font-medium">✓ No products out of stock</p>
+                ) : outOfStockAlerts?.slice(0, 5).map((p) => (
+                  <div key={p._id} className="flex items-center justify-between p-2 bg-red-50 rounded-lg">
+                    <div>
+                      <p className="text-sm font-medium text-slate-800">{p.name}</p>
+                      <p className="text-xs text-slate-500 font-mono">{p.productCode}</p>
+                    </div>
+                    <span className="badge badge-red">0 in stock</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Expiring Soon */}
+            <div>
+              <h4 className="text-sm font-semibold text-orange-700 mb-2 flex items-center gap-2">
+                <ClockIcon className="h-4 w-4" />
+                Expiring Soon ({expiringProducts?.length || 0})
+              </h4>
+              <div className="space-y-2">
+                {expiringProducts?.length === 0 ? (
+                  <p className="text-xs text-slate-500">No products expiring in next 90 days</p>
+                ) : expiringProducts?.slice(0, 5).map((p) => (
+                  <div key={p._id} className="flex items-center justify-between p-2 bg-orange-50 rounded-lg">
+                    <div>
+                      <p className="text-sm font-medium text-slate-800">{p.name}</p>
+                      <p className="text-xs text-slate-500 font-mono">{p.productCode}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-bold text-orange-700">{p.daysUntilExpiry} days</p>
+                      <p className="text-xs text-slate-500">Stock: {p.currentStock}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Expired */}
+            <div>
+              <h4 className="text-sm font-semibold text-red-700 mb-2 flex items-center gap-2">
+                <ClockIcon className="h-4 w-4" />
+                Expired ({expiredProducts?.length || 0})
+              </h4>
+              <div className="space-y-2">
+                {expiredProducts?.length === 0 ? (
+                  <p className="text-xs text-green-600 font-medium">✓ No expired products</p>
+                ) : expiredProducts?.slice(0, 5).map((p) => (
+                  <div key={p._id} className="flex items-center justify-between p-2 bg-red-50 rounded-lg">
+                    <div>
+                      <p className="text-sm font-medium text-slate-800">{p.name}</p>
+                      <p className="text-xs text-slate-500 font-mono">{p.productCode}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-bold text-red-700">{p.daysExpired} days ago</p>
+                      <p className="text-xs text-slate-500">Stock: {p.currentStock}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>

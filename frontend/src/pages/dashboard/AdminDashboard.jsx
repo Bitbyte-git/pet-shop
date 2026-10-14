@@ -42,7 +42,7 @@ export default function AdminDashboard() {
   if (loading) return <LoadingSpinner />;
   if (!data) return null;
 
-  const { stats, recentClients, recentBills, bmActivity, lowStockProducts, expiringSoonProducts, analytics } = data;
+  const { stats, recentClients, recentBills, bmActivity, lowStockProducts, outOfStockProducts, expiringSoonProducts, expiredProducts, analytics } = data;
   
   // Ensure analytics exists with defaults
   const analyticsData = analytics || {
@@ -188,10 +188,10 @@ export default function AdminDashboard() {
       </div>
 
       {/* Alerts Row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <Link to="/admin/inventory" className="card p-4 border-l-4 border-l-yellow-400 hover:shadow-md transition-shadow">
           <p className="text-2xl font-bold text-yellow-600">{stats.lowStockCount}</p>
-          <p className="text-sm text-slate-500">Low Stock Products</p>
+          <p className="text-sm text-slate-500">Low Stock</p>
         </Link>
         <Link to="/admin/inventory" className="card p-4 border-l-4 border-l-red-400 hover:shadow-md transition-shadow">
           <p className="text-2xl font-bold text-red-600">{stats.outOfStockCount}</p>
@@ -201,9 +201,13 @@ export default function AdminDashboard() {
           <p className="text-2xl font-bold text-orange-500">{stats.expiringSoonCount}</p>
           <p className="text-sm text-slate-500">Expiring Soon</p>
         </Link>
+        <Link to="/admin/inventory" className="card p-4 border-l-4 border-l-red-600 hover:shadow-md transition-shadow">
+          <p className="text-2xl font-bold text-red-700">{stats.expiredCount}</p>
+          <p className="text-sm text-slate-500">Expired</p>
+        </Link>
         <Link to="/admin/purchases" className="card p-4 border-l-4 border-l-blue-400 hover:shadow-md transition-shadow">
           <p className="text-2xl font-bold text-blue-600">{stats.totalPurchases || 0}</p>
-          <p className="text-sm text-slate-500">Total Purchase Orders</p>
+          <p className="text-sm text-slate-500">Purchase Orders</p>
         </Link>
       </div>
 

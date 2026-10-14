@@ -182,14 +182,33 @@ router.get('/admin', async (req, res) => {
     recentClients,
     recentBills: recentHistory.bills,
     bmActivity,
-    lowStockProducts: lowStockProducts.slice(0, 5).map((p) => ({
+    lowStockProducts: lowStockProducts.slice(0, 10).map((p) => ({
       _id: p._id, name: p.name, productCode: p.productCode,
       currentStock: p.currentStock, reorderLevel: p.reorderLevel,
+      category: p.category,
+      sellingPrice: p.sellingPrice,
     })),
-    expiringSoonProducts: expiringSoon.slice(0, 5).map((p) => ({
+    outOfStockProducts: outOfStockProducts.slice(0, 10).map((p) => ({
+      _id: p._id, name: p.name, productCode: p.productCode,
+      currentStock: p.currentStock, reorderLevel: p.reorderLevel,
+      category: p.category,
+      sellingPrice: p.sellingPrice,
+    })),
+    expiringSoonProducts: expiringSoon.slice(0, 10).map((p) => ({
       _id: p._id, name: p.name, productCode: p.productCode,
       expiryDate: p.expiryDate,
       daysUntilExpiry: Math.ceil((new Date(p.expiryDate) - now) / (1000 * 60 * 60 * 24)),
+      currentStock: p.currentStock,
+      category: p.category,
+      sellingPrice: p.sellingPrice,
+    })),
+    expiredProducts: expired.slice(0, 10).map((p) => ({
+      _id: p._id, name: p.name, productCode: p.productCode,
+      expiryDate: p.expiryDate,
+      daysExpired: Math.ceil((now - new Date(p.expiryDate)) / (1000 * 60 * 60 * 24)),
+      currentStock: p.currentStock,
+      category: p.category,
+      sellingPrice: p.sellingPrice,
     })),
     analytics: {
       salesByCategory,
@@ -221,7 +240,9 @@ router.get('/billing-manager', async (req, res) => {
   ]);
 
   const lowStock = products.filter((p) => p.currentStock <= p.reorderLevel && p.currentStock > 0);
+  const outOfStock = products.filter((p) => p.currentStock === 0);
   const expiring = products.filter((p) => p.expiryDate && new Date(p.expiryDate) <= ninetyDaysLater && new Date(p.expiryDate) >= now);
+  const expired = products.filter((p) => p.expiryDate && new Date(p.expiryDate) < now);
 
   // Sales by category for billing manager
   const categories = await ProductCategory.find({ status: 'ACTIVE' });
@@ -303,7 +324,9 @@ router.get('/billing-manager', async (req, res) => {
       totalCustomers: totalClients,
       totalProducts,
       lowStockCount: lowStock.length,
+      outOfStockCount: outOfStock.length,
       expiringSoonCount: expiring.length,
+      expiredCount: expired.length,
     },
     recentBills: recentHistory.bills,
     recentTransactions: recentTransactions.map((t) => ({
@@ -315,12 +338,23 @@ router.get('/billing-manager', async (req, res) => {
       performedByName: t.performedByName || t.performedBy?.name || 'System',
       createdAt: t.createdAt,
     })),
-    lowStockAlerts: lowStock.slice(0, 5).map((p) => ({
+    lowStockAlerts: lowStock.slice(0, 10).map((p) => ({
       _id: p._id, name: p.name, productCode: p.productCode, currentStock: p.currentStock, reorderLevel: p.reorderLevel,
+      category: p.category, sellingPrice: p.sellingPrice,
     })),
-    expiringProducts: expiring.slice(0, 5).map((p) => ({
+    outOfStockAlerts: outOfStock.slice(0, 10).map((p) => ({
+      _id: p._id, name: p.name, productCode: p.productCode, currentStock: p.currentStock, reorderLevel: p.reorderLevel,
+      category: p.category, sellingPrice: p.sellingPrice,
+    })),
+    expiringProducts: expiring.slice(0, 10).map((p) => ({
       _id: p._id, name: p.name, productCode: p.productCode, expiryDate: p.expiryDate,
       daysUntilExpiry: Math.ceil((new Date(p.expiryDate) - now) / (1000 * 60 * 60 * 24)),
+      currentStock: p.currentStock, category: p.category, sellingPrice: p.sellingPrice,
+    })),
+    expiredProducts: expired.slice(0, 10).map((p) => ({
+      _id: p._id, name: p.name, productCode: p.productCode, expiryDate: p.expiryDate,
+      daysExpired: Math.ceil((now - new Date(p.expiryDate)) / (1000 * 60 * 60 * 24)),
+      currentStock: p.currentStock, category: p.category, sellingPrice: p.sellingPrice,
     })),
     salesAnalytics: last7Days,
     analytics: {
