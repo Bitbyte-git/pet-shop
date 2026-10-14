@@ -141,6 +141,7 @@ const createProductBill = async (data, userId, userName) => {
         productCodeSnapshot: product.productCode,
         quantity: item.quantity,
         unitPrice,
+        purchasePriceSnapshot: product.purchasePrice, // Store cost price for profit calculation
         gstRate,
         gstAmount,
         discount: itemDiscount,

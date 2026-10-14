@@ -6,7 +6,8 @@ const billingItemSchema = new mongoose.Schema({
   productNameSnapshot: { type: String, required: true },
   productCodeSnapshot: { type: String },
   quantity: { type: Number, required: true, min: 1 },
-  unitPrice: { type: Number, required: true },
+  unitPrice: { type: Number, required: true }, // Selling price
+  purchasePriceSnapshot: { type: Number, required: true }, // Cost price for profit calculation
   gstRate: { type: Number, default: 0 },
   gstAmount: { type: Number, default: 0 },
   discount: { type: Number, default: 0 },

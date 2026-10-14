@@ -70,8 +70,8 @@ export default function ReportsPage() {
           const expired = allProducts.filter(p => p.expiryDate && new Date(p.expiryDate) < new Date());
           setInventoryData({ lowStock, outOfStock, expiringSoon, expired });
         } else {
-          // Admin: Fetch all data
-          const [billingRes, lowStockRes, expiringRes] = await Promise.all([
+          // Admin: Fetch all data (both product and clinic billing)
+          const [billingRes, clinicRes, lowStockRes, expiringRes] = await Promise.all([
             billingAPI.getHistory({
               startDate,
               endDate,
@@ -80,10 +80,18 @@ export default function ReportsPage() {
               paymentMethod: paymentMethod === 'ALL' ? undefined : paymentMethod,
               limit: 500
             }),
+            clinicAPI.getClinicBillings({
+              startDate,
+              endDate,
+              limit: 500
+            }),
             inventoryAPI.getLowStock(),
             inventoryAPI.getExpiry(90),
           ]);
-          setBills(billingRes.data.bills || []);
+          const productBills = billingRes.data.bills || [];
+          const clinicBillings = clinicRes.data.bills || [];
+          // Merge both types
+          setBills([...productBills, ...clinicBillings]);
           const allProducts = [...(lowStockRes.data?.products || []), ...(expiringRes.data?.products || [])];
           const lowStock = allProducts.filter(p => p.currentStock <= p.reorderLevel && p.currentStock > 0);
           const outOfStock = allProducts.filter(p => p.currentStock === 0);
@@ -103,14 +111,45 @@ export default function ReportsPage() {
 
   // Separate bills by type
   const productBills = bills.filter(b => b.billType === 'PRODUCT');
-  const clinicBills = bills.filter(b => b.billType === 'CLINIC' || !b.billType);
+  const clinicBills = bills.filter(b => b.billType === 'CLINIC' || (b.clinicBillId && !b.billType));
+
+  console.log('Total bills:', bills.length);
+  console.log('Product bills:', productBills.length);
+  console.log('Clinic bills:', clinicBills.length);
+  console.log('Sample product bill:', productBills[0]);
+  console.log('Sample clinic bill:', clinicBills[0]);
 
   // Calculate stats for Product Shop
+  let calculatedProfit = 0;
+  productBills.forEach(b => {
+    if (b.paymentStatus === 'PAID') {
+      const billProfit = (b.items || []).reduce((sum, item) => {
+        const sellingPrice = item.unitPrice || 0;
+        const costPrice = item.purchasePriceSnapshot || 0;
+        const itemProfit = (sellingPrice - costPrice) * item.quantity;
+        console.log(`Item profit: ${itemProfit} (selling: ${sellingPrice}, cost: ${costPrice}, qty: ${item.quantity})`);
+        return sum + itemProfit;
+      }, 0);
+      console.log(`Bill ${b.invoiceNumber} profit: ${billProfit}`);
+      calculatedProfit += billProfit;
+    }
+  });
+  console.log('Total calculated profit:', calculatedProfit);
   const productStats = {
     totalBills: productBills.filter(b => b.paymentStatus === 'PAID').length,
     totalSales: productBills.reduce((s, b) => s + (b.paymentStatus === 'PAID' ? b.grandTotal : 0), 0),
     totalGST: productBills.reduce((s, b) => s + (b.paymentStatus === 'PAID' ? b.gstAmount : 0), 0),
     subtotal: productBills.reduce((s, b) => s + (b.paymentStatus === 'PAID' ? b.subtotal : 0), 0),
+    totalProfit: productBills.reduce((s, b) => {
+      if (b.paymentStatus !== 'PAID') return s;
+      // Calculate profit from items using purchasePriceSnapshot
+      const itemProfit = (b.items || []).reduce((itemSum, item) => {
+        const sellingPrice = item.unitPrice || 0;
+        const costPrice = item.purchasePriceSnapshot || 0;
+        return itemSum + ((sellingPrice - costPrice) * item.quantity);
+      }, 0);
+      return s + itemProfit;
+    }, 0),
   };
 
   // Calculate stats for Clinic (no GST, always active)
@@ -127,6 +166,7 @@ export default function ReportsPage() {
     totalSales: productStats.totalSales + clinicStats.totalSales,
     totalGST: productStats.totalGST,
     subtotal: productStats.subtotal + clinicStats.subtotal,
+    totalProfit: productStats.totalProfit || 0,
   };
 
   // Prepare chart data - only use filtered bills that match current filters
@@ -193,23 +233,34 @@ export default function ReportsPage() {
       'Date',
       'Subtotal',
       'GST',
+      'Profit',
       'Total',
       'Payment Method',
       'Status',
     ];
 
     // Prepare CSV data
-    const csvData = currentBills.map(bill => [
-      bill.billNumber,
-      bill.billType,
-      bill.clientName,
-      formatDate(bill.createdAt),
-      bill.subtotal.toFixed(2),
-      bill.gstAmount ? bill.gstAmount.toFixed(2) : '0.00',
-      bill.grandTotal.toFixed(2),
-      bill.paymentMethod,
-      bill.paymentStatus,
-    ].map(escapeCSV));
+    const csvData = currentBills.map(bill => {
+      // Calculate profit for each bill
+      const billProfit = (bill.items || []).reduce((sum, item) => {
+        const sellingPrice = item.unitPrice || item.sellingPrice || item.price || 0;
+        const costPrice = item.purchasePriceSnapshot || item.costPrice || item.purchasePrice || 0;
+        return sum + ((sellingPrice - costPrice) * item.quantity);
+      }, 0);
+
+      return [
+        bill.billNumber,
+        bill.billType,
+        bill.clientName,
+        formatDate(bill.createdAt),
+        bill.subtotal ? bill.subtotal.toFixed(2) : '0.00',
+        bill.gstAmount ? bill.gstAmount.toFixed(2) : '0.00',
+        billProfit.toFixed(2),
+        bill.grandTotal ? bill.grandTotal.toFixed(2) : (bill.totalAmount || 0).toFixed(2),
+        bill.paymentMethod || 'N/A',
+        bill.paymentStatus || 'ACTIVE',
+      ].map(escapeCSV);
+    });
 
     // Combine headers and data
     const csvContent = [
@@ -230,6 +281,7 @@ export default function ReportsPage() {
       `Total Bills: ${currentStats.totalBills}`,
       `Total Revenue: ${currentStats.totalSales.toFixed(2)}`,
       `GST Collected: ${currentStats.totalGST.toFixed(2)}`,
+      `Total Profit: ${(currentStats.totalProfit || 0).toFixed(2)}`,
       '',
       'BILL DETAILS',
       '',
@@ -344,7 +396,7 @@ export default function ReportsPage() {
       {loading ? <LoadingSpinner /> : (
         <>
           {/* Summary Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             <div className="card card-body border-l-4 border-l-blue-500">
               <div className="flex items-center justify-between">
                 <div>
@@ -364,15 +416,27 @@ export default function ReportsPage() {
               </div>
             </div>
             {showProductTab && activeTab !== 'clinic' && (
-              <div className="card card-body border-l-4 border-l-amber-500">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-slate-500">GST Collected</p>
-                    <p className="text-2xl font-bold text-amber-600">{formatCurrency(currentStats.totalGST)}</p>
+              <>
+                <div className="card card-body border-l-4 border-l-amber-500">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-slate-500">GST Collected</p>
+                      <p className="text-2xl font-bold text-amber-600">{formatCurrency(currentStats.totalGST)}</p>
+                    </div>
+                    <CurrencyRupeeIcon className="h-8 w-8 text-amber-500" />
                   </div>
-                  <CurrencyRupeeIcon className="h-8 w-8 text-amber-500" />
                 </div>
+                <div className="card card-body border-l-4 border-l-emerald-500">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-slate-500">Total Profit</p>
+                  <p className="text-2xl font-bold text-emerald-600">{formatCurrency(currentStats.totalProfit || 0)}</p>
+                </div>
+                <ChartBarIcon className="h-8 w-8 text-emerald-500" />
               </div>
+              <p className="text-xs text-slate-400 mt-1">Selling Price - Cost Price</p>
+            </div>
+              </>
             )}
             <div className="card card-body border-l-4 border-l-purple-500">
               <div className="flex items-center justify-between">
@@ -404,6 +468,10 @@ export default function ReportsPage() {
                   <div className="flex justify-between items-center">
                     <span className="text-slate-600">GST Collected</span>
                     <span className="font-bold text-amber-600">{formatCurrency(productStats.totalGST)}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-600">Total Profit</span>
+                    <span className="font-bold text-emerald-600">{formatCurrency(productStats.totalProfit || 0)}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-slate-600">Number of Bills</span>
@@ -608,6 +676,7 @@ export default function ReportsPage() {
                     <th>Date</th>
                     <th>Subtotal</th>
                     {showProductTab && <th>GST</th>}
+                    {(showProductTab || showCombinedTab) && <th>Profit</th>}
                     <th>Total</th>
                     {showProductTab && <th>Method</th>}
                     {showProductTab && <th>Status</th>}
@@ -616,42 +685,57 @@ export default function ReportsPage() {
                 <tbody>
                   {currentBills.length === 0 ? (
                     <tr>
-                      <td colSpan={showCombinedTab ? 9 : showProductTab ? 8 : 5} className="text-center py-8 text-slate-400">
+                      <td colSpan={showCombinedTab ? 10 : showProductTab ? 9 : 5} className="text-center py-8 text-slate-400">
                         No bills found for the selected filters
                       </td>
                     </tr>
-                  ) : currentBills.map((b) => (
-                    <tr key={b._id}>
-                      <td className="font-mono font-bold text-primary-700">{b.billNumber || b.clinicBillId}</td>
-                      {showCombinedTab && (
-                        <td>
-                          <span className={`badge text-xs ${b.billType === 'PRODUCT' ? 'badge-blue' : 'badge-amber'}`}>
-                            {b.billType || 'CLINIC'}
-                          </span>
-                        </td>
-                      )}
-                      <td>{b.clientName}</td>
-                      <td className="text-xs text-slate-500">{formatDate(b.createdAt)}</td>
-                      <td>{formatCurrency(b.subtotal || b.totalAmount)}</td>
-                      {showProductTab && (
-                        <td className={b.billType === 'CLINIC' || !b.billType ? 'text-slate-400' : ''}>
-                          {formatCurrency(b.gstAmount || 0)}
-                        </td>
-                      )}
-                      <td className="font-bold">{formatCurrency(b.grandTotal || b.totalAmount)}</td>
-                      {showProductTab && (
-                        <td>
-                          <span className="badge badge-slate">{b.paymentMethod || 'N/A'}</span>
-                        </td>
-                      )}
-                      {showProductTab && (
-                        <td>
-                          <span className={`badge ${b.paymentStatus === 'PAID' ? 'badge-green' : 'badge-red'}`}>
-                            {b.paymentStatus || 'ACTIVE'}
-                          </span>
-                        </td>
-                      )}
-                    </tr>
+                  ) : currentBills.map((b) => {
+                    // Calculate profit for each bill
+                    const billProfit = (b.items || []).reduce((sum, item) => {
+                      const sellingPrice = item.unitPrice || item.sellingPrice || item.price || 0;
+                      const costPrice = item.purchasePriceSnapshot || item.costPrice || item.purchasePrice || 0;
+                      return sum + ((sellingPrice - costPrice) * item.quantity);
+                    }, 0);
+
+                    return (
+                      <tr key={b._id}>
+                        <td className="font-mono font-bold text-primary-700">{b.billNumber || b.clinicBillId}</td>
+                        {showCombinedTab && (
+                          <td>
+                            <span className={`badge text-xs ${b.billType === 'PRODUCT' ? 'badge-blue' : 'badge-amber'}`}>
+                              {b.billType || 'CLINIC'}
+                            </span>
+                          </td>
+                        )}
+                        <td>{b.clientName}</td>
+                        <td className="text-xs text-slate-500">{formatDate(b.createdAt)}</td>
+                        <td>{formatCurrency(b.subtotal || b.totalAmount)}</td>
+                        {showProductTab && (
+                          <td className={b.billType === 'CLINIC' || !b.billType ? 'text-slate-400' : ''}>
+                            {formatCurrency(b.gstAmount || 0)}
+                          </td>
+                        )}
+                        {(showProductTab || showCombinedTab) && (
+                          <td className={`font-bold ${billProfit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                            {b.billType === 'PRODUCT' ? formatCurrency(billProfit) : 'N/A'}
+                          </td>
+                        )}
+                        <td className="font-bold">{formatCurrency(b.grandTotal || b.totalAmount)}</td>
+                        {showProductTab && (
+                          <td>
+                            <span className="badge badge-slate">{b.paymentMethod || 'N/A'}</span>
+                          </td>
+                        )}
+                        {showProductTab && (
+                          <td>
+                            <span className={`badge ${b.paymentStatus === 'PAID' ? 'badge-green' : 'badge-red'}`}>
+                              {b.paymentStatus || 'ACTIVE'}
+                            </span>
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  })}
                   ))}
                 </tbody>
               </table>
