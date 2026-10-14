@@ -9,7 +9,7 @@ const userSchema = new mongoose.Schema(
     password: { type: String, required: true, minlength: 6 },
     role: {
       type: String,
-      enum: ['SUPER_ADMIN', 'ADMIN', 'BILLING_MANAGER'],
+      enum: ['SUPER_ADMIN', 'ADMIN', 'BILLING_MANAGER', 'CLINIC_MANAGER'],
       required: true,
     },
     status: { type: String, enum: ['ACTIVE', 'INACTIVE'], default: 'ACTIVE' },

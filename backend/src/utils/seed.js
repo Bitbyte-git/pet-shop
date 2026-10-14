@@ -35,6 +35,17 @@ async function seed() {
   });
   console.log('Created Billing Manager:', bm.email);
 
+  // Create Clinic Manager
+  const cm = await User.create({
+    name: 'Clinic Manager',
+    email: 'clinic@petclinic.com',
+    phone: '9876543212',
+    password: 'clinic123',
+    role: 'CLINIC_MANAGER',
+    status: 'ACTIVE',
+  });
+  console.log('Created Clinic Manager:', cm.email);
+
   // Create default categories
   const categories = [
     { name: 'Medicines & Tablets', prefix: 'MED', description: 'Veterinary medicines and tablets' },
@@ -275,6 +286,7 @@ async function seed() {
   console.log('─────────────────────────────────────────');
   console.log('Admin Login:          admin@petclinic.com / admin123');
   console.log('Billing Manager Login: billing@petclinic.com / billing123');
+  console.log('Clinic Manager Login:  clinic@petclinic.com / clinic123');
   console.log('─────────────────────────────────────────');
 
   await mongoose.disconnect();

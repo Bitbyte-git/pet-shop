@@ -20,7 +20,7 @@ export default function ClinicBillingPage() {
   const [clientSearch, setClientSearch] = useState('');
   const [clientResults, setClientResults] = useState([]);
   const [pets, setPets] = useState([]);
-  const [form, setForm] = useState({ clientId: '', petId: '', consultationId: '', notes: '', items: [{ type: 'CONSULTATION', description: '', quantity: 1, unitCost: '' }] });
+  const [form, setForm] = useState({ client: '', pet: '', consultation: '', notes: '', items: [{ type: 'CONSULTATION', description: '', quantity: 1, unitCost: '' }] });
 
   const fetch = useCallback(async () => {
     setLoading(true);
@@ -41,7 +41,7 @@ export default function ClinicBillingPage() {
   }, [clientSearch]);
 
   const selectClient = async (client) => {
-    setForm((f) => ({ ...f, clientId: client._id }));
+    setForm((f) => ({ ...f, client: client._id }));
     setClientSearch(client.name);
     setClientResults([]);
     const r = await petAPI.getByOwner(client._id);
@@ -56,14 +56,65 @@ export default function ClinicBillingPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Validation
+    if (!form.client) {
+      toast.error('Please select a client');
+      return;
+    }
+    if (!form.pet) {
+      toast.error('Please select a pet');
+      return;
+    }
+    if (!form.items || form.items.length === 0) {
+      toast.error('Please add at least one billing item');
+      return;
+    }
+    
+    // Validate each item
+    for (const item of form.items) {
+      if (!item.description || item.description.trim() === '') {
+        toast.error('Please provide a description for all items');
+        return;
+      }
+      if (!item.unitCost || item.unitCost <= 0) {
+        toast.error('Please provide a valid cost for all items');
+        return;
+      }
+      if (!item.quantity || item.quantity < 1) {
+        toast.error('Quantity must be at least 1 for all items');
+        return;
+      }
+    }
+
+    // Calculate total amount and prepare line totals
+    const billingItems = form.items.map(item => ({
+      ...item,
+      lineTotal: item.quantity * item.unitCost
+    }));
+    const totalAmount = billingItems.reduce((sum, item) => sum + item.lineTotal, 0);
+
+    const submissionData = {
+      client: form.client,
+      pet: form.pet,
+      consultation: form.consultation || null, // Convert empty string to null
+      items: billingItems,
+      totalAmount,
+      gstAmount: 0,
+      notes: form.notes || ''
+    };
+
     setSaving(true);
     try {
-      await clinicAPI.createClinicBilling(form);
+      console.log('Submitting clinic billing:', submissionData);
+      await clinicAPI.createClinicBilling(submissionData);
       toast.success('Clinic billing record saved. GST: ₹0 (Internal record).');
       setModal(false);
       fetch();
-    } catch (err) { toast.error(errorMessage(err)); }
-    finally { setSaving(false); }
+    } catch (err) {
+      console.error('Error creating clinic billing:', err);
+      toast.error(errorMessage(err));
+    } finally { setSaving(false); }
   };
 
   return (
@@ -129,7 +180,7 @@ export default function ClinicBillingPage() {
             </div>
             <div>
               <label className="label">Pet *</label>
-              <select className="input" value={form.petId} onChange={(e) => setForm({ ...form, petId: e.target.value })} required>
+              <select className="input" value={form.pet} onChange={(e) => setForm({ ...form, pet: e.target.value })} required>
                 <option value="">Select pet</option>
                 {pets.map((p) => <option key={p._id} value={p._id}>{p.name}</option>)}
               </select>

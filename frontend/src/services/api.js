@@ -104,12 +104,17 @@ export const clinicAPI = {
   getConsultationById: (id) => api.get(`/clinic/consultations/${id}`),
   createConsultation: (data) => api.post('/clinic/consultations', data),
   updateConsultation: (id, data) => api.put(`/clinic/consultations/${id}`, data),
+  completeConsultation: (id, data) => api.patch(`/clinic/consultations/${id}/complete`, data),
+  completeFollowUp: (id) => api.patch(`/clinic/consultations/${id}/followup-complete`),
   getTreatments: (params) => api.get('/clinic/treatments', { params }),
   createTreatment: (data) => api.post('/clinic/treatments', data),
   updateTreatment: (id, data) => api.put(`/clinic/treatments/${id}`, data),
+  completeTreatment: (id) => api.patch(`/clinic/treatments/${id}/complete`),
   getClinicBillings: (params) => api.get('/clinic/billing', { params }),
   getClinicBillingById: (id) => api.get(`/clinic/billing/${id}`),
   createClinicBilling: (data) => api.post('/clinic/billing', data),
+  getFollowups: (params) => api.get('/clinic/followups', { params }),
+  updateFollowup: (id, data) => api.put(`/clinic/followups/${id}`, data),
 };
 
 // ── Prescriptions ─────────────────────────────────────────────────────────────
@@ -163,4 +168,5 @@ export const userAPI = {
 export const dashboardAPI = {
   getAdminStats: () => api.get('/dashboard/admin'),
   getBillingManagerStats: () => api.get('/dashboard/billing-manager'),
+  getClinicManagerStats: () => api.get('/dashboard/clinic-manager'),
 };

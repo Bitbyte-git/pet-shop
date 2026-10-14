@@ -20,7 +20,13 @@ export default function LoginPage() {
     try {
       const user = await login(form.email, form.password);
       toast.success(`Welcome back, ${user.name}!`);
-      navigate(user.role === 'ADMIN' ? '/admin' : '/billing', { replace: true });
+      if (user.role === 'ADMIN') {
+        navigate('/admin', { replace: true });
+      } else if (user.role === 'CLINIC_MANAGER') {
+        navigate('/clinic', { replace: true });
+      } else {
+        navigate('/billing', { replace: true });
+      }
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -95,7 +101,7 @@ export default function LoginPage() {
         {/* Demo credentials */}
         <div className="mt-6 pt-5 border-t border-slate-100">
           <p className="text-xs text-slate-400 text-center font-medium mb-3">Demo Credentials</p>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             <button
               type="button"
               onClick={() => setForm({ email: 'admin@petclinic.com', password: 'admin123' })}
@@ -111,6 +117,14 @@ export default function LoginPage() {
             >
               <p className="font-semibold text-slate-700">Billing Manager</p>
               <p className="text-slate-400">billing@petclinic.com</p>
+            </button>
+            <button
+              type="button"
+              onClick={() => setForm({ email: 'clinic@petclinic.com', password: 'clinic123' })}
+              className="text-xs bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg p-2 text-left transition-colors"
+            >
+              <p className="font-semibold text-slate-700">Clinic Manager</p>
+              <p className="text-slate-400">clinic@petclinic.com</p>
             </button>
           </div>
         </div>

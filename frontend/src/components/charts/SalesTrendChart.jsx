@@ -9,7 +9,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 
-export default function SalesTrendChart({ data }) {
+export default function SalesTrendChart({ data, showClinicOnly = false }) {
   if (!data || !Array.isArray(data) || data.length === 0) {
     return (
       <div className="flex items-center justify-center h-64 text-slate-400">
@@ -29,7 +29,7 @@ export default function SalesTrendChart({ data }) {
           contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0' }}
         />
         <Legend />
-        <Bar dataKey="productSales" name="Product Sales" fill="#3b82f6" />
+        {!showClinicOnly && <Bar dataKey="productSales" name="Product Sales" fill="#3b82f6" />}
         <Bar dataKey="clinicSales" name="Clinic Sales" fill="#f59e0b" />
       </BarChart>
     </ResponsiveContainer>

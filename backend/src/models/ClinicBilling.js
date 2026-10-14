@@ -19,6 +19,15 @@ const clinicBillingSchema = new mongoose.Schema(
     totalAmount: { type: Number, required: true },
     gstAmount: { type: Number, default: 0 }, // Always 0 for clinic
     notes: { type: String },
+    // Follow-up and Treatment Details
+    treatmentDetails: { type: String },
+    followUpDate: { type: Date },
+    nextVisitReason: { type: String },
+    followUpContacted: { type: Boolean, default: false },
+    followUpNotes: { type: String },
+    veterinarian: { type: String },
+    diagnosis: { type: String },
+    prescription: { type: String },
     status: { type: String, enum: ['ACTIVE', 'CANCELLED'], default: 'ACTIVE' },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },

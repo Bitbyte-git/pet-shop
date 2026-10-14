@@ -4,6 +4,7 @@ import { ProtectedRoute, GuestRoute } from './routes/ProtectedRoute';
 import AuthLayout from './layouts/AuthLayout';
 import AdminLayout from './layouts/AdminLayout';
 import BillingLayout from './layouts/BillingLayout';
+import ClinicLayout from './layouts/ClinicLayout';
 
 // Auth Pages
 import LoginPage from './pages/auth/LoginPage';
@@ -11,6 +12,7 @@ import LoginPage from './pages/auth/LoginPage';
 // Admin Pages
 import AdminDashboard from './pages/dashboard/AdminDashboard';
 import BillingManagerDashboard from './pages/dashboard/BillingManagerDashboard';
+import ClinicManagerDashboard from './pages/dashboard/ClinicManagerDashboard';
 import ClientsPage from './pages/clients/ClientsPage';
 import ClientDetailPage from './pages/clients/ClientDetailPage';
 import PetsPage from './pages/pets/PetsPage';
@@ -24,6 +26,7 @@ import ConsultationsPage from './pages/clinic/ConsultationsPage';
 import TreatmentsPage from './pages/clinic/TreatmentsPage';
 import PrescriptionsPage from './pages/clinic/PrescriptionsPage';
 import ClinicBillingPage from './pages/clinic/ClinicBillingPage';
+import FollowupsPage from './pages/clinic/FollowupsPage';
 import BillingHistoryPage from './pages/billing/BillingHistoryPage';
 import NewBillPage from './pages/billing/NewBillPage';
 import InvoiceDetailPage from './pages/billing/InvoiceDetailPage';
@@ -89,6 +92,29 @@ function BillingRoutes() {
   );
 }
 
+function ClinicRoutes() {
+  return (
+    <ProtectedRoute roles={['CLINIC_MANAGER', 'ADMIN']}>
+      <ClinicLayout>
+        <Routes>
+          <Route index element={<ClinicManagerDashboard />} />
+          <Route path="consultations" element={<ConsultationsPage />} />
+          <Route path="treatments" element={<TreatmentsPage />} />
+          <Route path="billing" element={<ClinicBillingPage />} />
+          <Route path="followups" element={<FollowupsPage />} />
+          <Route path="customers" element={<ClientsPage />} />
+          <Route path="customers/:id" element={<ClientDetailPage />} />
+          <Route path="pets" element={<PetsPage />} />
+          <Route path="pets/:id" element={<PetDetailPage />} />
+          <Route path="prescriptions" element={<PrescriptionsPage />} />
+          <Route path="reports" element={<ReportsPage />} />
+          <Route path="*" element={<Navigate to="/clinic" replace />} />
+        </Routes>
+      </ClinicLayout>
+    </ProtectedRoute>
+  );
+}
+
 export default function App() {
   return (
     <AuthProvider>
@@ -101,6 +127,7 @@ export default function App() {
         } />
         <Route path="/admin/*" element={<AdminRoutes />} />
         <Route path="/billing/*" element={<BillingRoutes />} />
+        <Route path="/clinic/*" element={<ClinicRoutes />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </AuthProvider>

@@ -7,6 +7,7 @@ const Product = require('../models/Product');
 const ProductCategory = require('../models/ProductCategory');
 const ProductBilling = require('../models/ProductBilling');
 const ClinicBilling = require('../models/ClinicBilling');
+const Consultation = require('../models/Consultation');
 const InventoryTransaction = require('../models/InventoryTransaction');
 const Supplier = require('../models/Supplier');
 const Purchase = require('../models/Purchase');
@@ -360,6 +361,163 @@ router.get('/billing-manager', async (req, res) => {
     analytics: {
       salesByCategory,
       stockByCategory,
+    },
+  });
+});
+
+router.get('/clinic-manager', async (req, res) => {
+  const now = new Date();
+  const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0);
+  const endOfDay = new Date(); endOfDay.setHours(23, 59, 59, 999);
+  const sevenDaysLater = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+  const [
+    totalClients,
+    totalPets,
+    totalConsultations,
+    totalClinicBills,
+    todayClinicBills,
+    recentConsultations,
+    recentTreatments,
+  ] = await Promise.all([
+    Client.countDocuments({ status: 'ACTIVE' }),
+    Pet.countDocuments({ status: 'ACTIVE' }),
+    Consultation.countDocuments(),
+    ClinicBilling.countDocuments({ status: 'ACTIVE' }),
+    ClinicBilling.countDocuments({
+      status: 'ACTIVE',
+      createdAt: { $gte: startOfDay, $lte: endOfDay }
+    }),
+    Consultation.find()
+      .populate('client', 'name')
+      .populate('pet', 'name')
+      .sort({ visitDate: -1 })
+      .limit(5),
+    ClinicBilling.find({ status: 'ACTIVE' })
+      .populate('client', 'name')
+      .populate('pet', 'name')
+      .sort({ createdAt: -1 })
+      .limit(5),
+  ]);
+
+  // Calculate today's clinic sales
+  const todayClinicRecords = await ClinicBilling.find({
+    status: 'ACTIVE',
+    createdAt: { $gte: startOfDay, $lte: endOfDay }
+  });
+  const todayClinicSales = todayClinicRecords.reduce((sum, b) => sum + b.totalAmount, 0);
+
+  // Calculate follow-up stats from both Consultations and ClinicBilling
+  const consultationFollowups = await Consultation.find({
+    followUpDate: { $ne: null },
+    followUpCompleted: false,
+  });
+
+  const clinicBillingFollowups = await ClinicBilling.find({
+    status: 'ACTIVE',
+    followUpDate: { $ne: null },
+    followUpContacted: false,
+  });
+
+  const allFollowups = [
+    ...consultationFollowups.map(c => ({
+      _id: c._id,
+      type: 'CONSULTATION',
+      client: c.client,
+      pet: c.pet,
+      followUpDate: c.followUpDate,
+      followUpReason: c.followUpReason,
+      symptoms: c.symptoms,
+    })),
+    ...clinicBillingFollowups.map(b => ({
+      _id: b._id,
+      type: 'BILLING',
+      client: b.client,
+      pet: b.pet,
+      followUpDate: b.followUpDate,
+      followUpReason: b.nextVisitReason,
+      symptoms: 'Treatment follow-up',
+    }))
+  ];
+
+  const upcomingFollowups = allFollowups.filter(f => new Date(f.followUpDate) >= now).length;
+  const overdueFollowups = allFollowups.filter(f => new Date(f.followUpDate) < now).length;
+  const pendingFollowups = upcomingFollowups;
+
+  const followupAlerts = allFollowups
+    .filter(f => new Date(f.followUpDate) >= now && new Date(f.followUpDate) <= sevenDaysLater)
+    .sort((a, b) => new Date(a.followUpDate) - new Date(b.followUpDate))
+    .slice(0, 5);
+
+  // 7-day clinic sales trend
+  const salesTrend = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    d.setHours(0, 0, 0, 0);
+    const end = new Date(d);
+    end.setHours(23, 59, 59, 999);
+
+    const cBills = await ClinicBilling.find({ createdAt: { $gte: d, $lte: end }, status: 'ACTIVE' });
+    const cSales = cBills.reduce((s, b) => s + b.totalAmount, 0);
+
+    salesTrend.push({
+      date: d.toISOString().split('T')[0],
+      dayName: d.toLocaleDateString('en-US', { weekday: 'short' }),
+      clinicSales: cSales,
+      count: cBills.length,
+    });
+  }
+
+  res.json({
+    success: true,
+    stats: {
+      totalClients,
+      totalPets,
+      totalConsultations,
+      totalTreatments: totalClinicBills,
+      todayClinicBills,
+      todayClinicSales,
+      upcomingFollowups,
+      pendingFollowups,
+      overdueFollowups,
+    },
+    recentConsultations: recentConsultations.map(c => ({
+      _id: c._id,
+      clientName: c.client?.name || 'Unknown',
+      petName: c.pet?.name || 'Unknown',
+      reason: c.symptoms || 'General consultation',
+      consultationDate: c.visitDate,
+      status: c.status,
+    })),
+    upcomingFollowups: followupAlerts.map(f => ({
+      _id: f._id,
+      type: f.type,
+      clientName: f.client?.name || 'Unknown',
+      petName: f.pet?.name || 'Unknown',
+      followUpDate: f.followUpDate,
+      daysUntil: Math.ceil((new Date(f.followUpDate) - now) / (1000 * 60 * 60 * 24)),
+      reason: f.followUpReason || 'Follow-up visit',
+    })),
+    recentTreatments: recentTreatments.map(t => ({
+      _id: t._id,
+      clientName: t.client?.name || 'Unknown',
+      petName: t.pet?.name || 'Unknown',
+      description: t.items?.[0]?.description || 'Treatment',
+      date: t.createdAt,
+      followUpDate: t.followUpDate,
+    })),
+    followupAlerts: followupAlerts.map(f => ({
+      _id: f._id,
+      type: f.type,
+      clientName: f.client?.name || 'Unknown',
+      petName: f.pet?.name || 'Unknown',
+      followUpDate: f.followUpDate,
+      daysUntil: Math.ceil((new Date(f.followUpDate) - now) / (1000 * 60 * 60 * 24)),
+      reason: f.followUpReason || 'Follow-up visit',
+    })),
+    analytics: {
+      salesTrend,
     },
   });
 });

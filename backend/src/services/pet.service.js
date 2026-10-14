@@ -31,7 +31,9 @@ const getPetById = async (id) => {
 };
 
 const getPetsByOwner = async (ownerId) => {
-  return Pet.find({ owner: ownerId, status: { $ne: 'DECEASED' } });
+  // Fetch all pets for this owner, regardless of status
+  // This ensures we show all pets even if they have INACTIVE or other statuses
+  return Pet.find({ owner: ownerId });
 };
 
 const createPet = async (data, userId) => {
