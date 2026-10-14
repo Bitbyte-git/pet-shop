@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { billingAPI, clinicAPI, clientAPI, petAPI, productAPI } from '../../services/api';
 import Modal from '../../components/common/Modal';
@@ -8,6 +8,7 @@ import {
   UserIcon, MagnifyingGlassIcon, XMarkIcon, PlusIcon, TrashIcon,
   CheckCircleIcon, DocumentArrowDownIcon, PrinterIcon, PlusCircleIcon,
   ReceiptPercentIcon, BeakerIcon, ShoppingBagIcon, UserPlusIcon,
+  ChevronRightIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
@@ -31,6 +32,10 @@ export default function NewBillPage() {
   const [walkInMobile, setWalkInMobile] = useState('');
   const [pets, setPets] = useState([]);
   const [selectedPet, setSelectedPet] = useState(null);
+  
+  // Refs for click-outside detection
+  const clientDropdownRef = useRef(null);
+  const productDropdownRef = useRef(null);
 
   // Quick Register Modal State
   const [showQuickRegisterModal, setShowQuickRegisterModal] = useState(false);
@@ -71,6 +76,28 @@ export default function NewBillPage() {
     }, 200);
     return () => clearTimeout(t);
   }, [productSearch]);
+
+  // Click outside handler for client dropdown
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (clientDropdownRef.current && !clientDropdownRef.current.contains(event.target)) {
+        setShowClientDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Click outside handler for product dropdown
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (productDropdownRef.current && !productDropdownRef.current.contains(event.target)) {
+        setShowProductDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const selectClient = async (client) => {
     setSelectedClient(client);
@@ -475,7 +502,7 @@ export default function NewBillPage() {
         <div className="lg:col-span-2 space-y-4">
 
           {/* Customer Selection Card */}
-          <div className="card card-body space-y-3">
+          <div className="card card-body space-y-3 relative z-40">
             <div className="flex items-center justify-between">
               <h3 className="font-semibold text-slate-700 flex items-center gap-2">
                 <UserIcon className="h-4 w-4 text-primary-600" />
@@ -520,25 +547,34 @@ export default function NewBillPage() {
               </div>
             ) : (
               <>
-                <div className="relative">
-                  <div className="flex justify-between items-center mb-1">
-                    <label className="label mb-0">Search Registered Client *</label>
+                <div className="relative" ref={clientDropdownRef}>
+                  <div className="flex justify-between items-center mb-2">
+                    <label className="label mb-0 text-sm font-semibold text-slate-700">Search Registered Client *</label>
+                    <span className="text-xs text-primary-600 font-medium">Start typing to search</span>
                   </div>
                   <div className="relative">
-                    <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <MagnifyingGlassIcon className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
                     {selectedClient ? (
-                      <div className="input flex items-center justify-between bg-primary-50/50 border-primary-300">
-                        <div>
-                          <span className="font-bold text-slate-800">{selectedClient.name}</span>
-                          <span className="text-slate-500 text-xs ml-2">({selectedClient.clientId} · 📱 {selectedClient.mobile})</span>
+                      <div className="input flex items-center justify-between bg-gradient-to-r from-primary-50 to-primary-100/50 border-primary-400 pl-11 pr-4 py-3 shadow-md">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-primary-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                            {selectedClient.name?.[0]?.toUpperCase()}
+                          </div>
+                          <div>
+                            <p className="font-bold text-slate-800 text-base">{selectedClient.name}</p>
+                            <div className="flex items-center gap-2 text-xs text-slate-600">
+                              <span className="badge badge-slate">{selectedClient.clientId}</span>
+                              <span>📱 {selectedClient.mobile}</span>
+                            </div>
+                          </div>
                         </div>
-                        <button onClick={clearClient} className="text-slate-400 hover:text-red-500">
-                          <XMarkIcon className="h-4 w-4" />
+                        <button onClick={clearClient} className="text-slate-400 hover:text-red-500 p-2 rounded-lg hover:bg-red-50 transition-colors">
+                          <XMarkIcon className="h-5 w-5" />
                         </button>
                       </div>
                     ) : (
                       <input
-                        className="input pl-9"
+                        className="input pl-11 py-3 text-base shadow-sm"
                         value={clientSearch}
                         onChange={(e) => {
                           setClientSearch(e.target.value);
@@ -548,56 +584,141 @@ export default function NewBillPage() {
                           setShowClientDropdown(true);
                           clientAPI.search(clientSearch).then((r) => setClientResults(r.data.clients || []));
                         }}
-                        placeholder="Click or type to search client by name, mobile, ID..."
+                        placeholder="🔍 Search by name, mobile number, or client ID..."
                       />
                     )}
                   </div>
-                  {showClientDropdown && !selectedClient && clientResults.length > 0 && (
-                    <div className="absolute z-20 top-full mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-xl max-h-56 overflow-y-auto">
-                      <div className="p-2 bg-slate-50 border-b text-xs text-slate-500 font-semibold flex justify-between">
-                        <span>{clientSearch ? `Matching Clients (${clientResults.length})` : `Recent Clients (${clientResults.length})`}</span>
-                        <button type="button" onClick={() => setShowClientDropdown(false)} className="text-slate-400 hover:text-slate-700">Close ✕</button>
+                  
+                  {/* Enhanced Client Dropdown */}
+                  {showClientDropdown && !selectedClient && (
+                    <div className="absolute z-50 top-full mt-2 w-full bg-white border border-slate-200 rounded-2xl shadow-2xl max-h-80 overflow-y-auto">
+                      <div className="sticky top-0 bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-200 p-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-semibold text-slate-700">
+                            {clientSearch ? `🔍 Found ${clientResults.length} client(s)` : `📋 All Clients (${clientResults.length})`}
+                          </span>
+                          <button type="button" onClick={() => setShowClientDropdown(false)} className="text-slate-400 hover:text-slate-700 px-2 py-1 rounded-lg hover:bg-slate-200 transition-colors">
+                            <XMarkIcon className="h-4 w-4" />
+                          </button>
+                        </div>
                       </div>
-                      {clientResults.map((c) => (
-                        <button key={c._id} type="button" onClick={() => selectClient(c)}
-                          className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-50 text-sm border-b last:border-0 text-left">
-                          <div className="text-left">
-                            <p className="font-medium text-slate-800">{c.name}</p>
-                            <p className="text-xs text-slate-400">{c.clientId} · 📱 {c.mobile}</p>
-                          </div>
-                          <span className="text-xs btn btn-secondary btn-sm">Select</span>
-                        </button>
-                      ))}
+                      {clientResults.length === 0 ? (
+                        <div className="p-8 text-center">
+                          <UserIcon className="h-12 w-12 text-slate-300 mx-auto mb-2" />
+                          <p className="text-slate-500 text-sm">No clients found</p>
+                          <button
+                            type="button"
+                            onClick={() => setShowQuickRegisterModal(true)}
+                            className="mt-3 btn btn-primary btn-sm"
+                          >
+                            <UserPlusIcon className="h-4 w-4" /> Register New Client
+                          </button>
+                        </div>
+                      ) : (
+                        clientResults.map((c) => (
+                          <button key={c._id} type="button" onClick={() => selectClient(c)}
+                            className="w-full flex items-center justify-between px-4 py-4 hover:bg-gradient-to-r hover:from-blue-50 hover:to-transparent text-sm border-b last:border-0 text-left transition-all duration-200 group">
+                            <div className="flex items-center gap-3">
+                              <div className="w-12 h-12 bg-gradient-to-br from-primary-100 to-primary-200 rounded-xl flex items-center justify-center text-primary-700 font-bold text-base group-hover:scale-110 transition-transform">
+                                {c.name?.[0]?.toUpperCase()}
+                              </div>
+                              <div className="text-left">
+                                <p className="font-bold text-slate-800 text-base">{c.name}</p>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <span className="badge badge-slate text-xs">{c.clientId}</span>
+                                  <span className="text-xs text-slate-500">📱 {c.mobile}</span>
+                                </div>
+                                {c.email && <p className="text-xs text-slate-400 mt-0.5">✉️ {c.email}</p>}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-slate-400 group-hover:text-primary-600 transition-colors">Select →</span>
+                              <ChevronRightIcon className="h-4 w-4 text-slate-300 group-hover:text-primary-600 transition-colors" />
+                            </div>
+                          </button>
+                        ))
+                      )}
                     </div>
                   )}
                 </div>
 
+                {/* Selected Client Details Panel - Compact */}
+                {selectedClient && (
+                  <div className="mt-3 p-3 bg-gradient-to-r from-primary-50 to-blue-50 rounded-xl border border-primary-200">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-600 rounded-xl flex items-center justify-center text-white font-bold text-sm shadow-md flex-shrink-0">
+                        {selectedClient.name?.[0]?.toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <h4 className="font-bold text-slate-800 text-sm truncate">{selectedClient.name}</h4>
+                          <button onClick={clearClient} className="text-slate-400 hover:text-red-500 p-1 rounded hover:bg-red-50 transition-colors flex-shrink-0">
+                            <XMarkIcon className="h-4 w-4" />
+                          </button>
+                        </div>
+                        <div className="flex items-center gap-2 mt-1 text-xs">
+                          <span className="badge badge-slate">{selectedClient.clientId}</span>
+                          <span className="text-slate-600">📱 {selectedClient.mobile}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Pet Selection */}
                 {selectedClient && (
-                  <div>
-                    <div className="flex justify-between items-center mb-1">
-                      <label className="label mb-0">Select Pet {flowType === 'CLINIC' && '*'}</label>
+                  <div className="mt-4">
+                    <div className="flex justify-between items-center mb-2">
+                      <label className="label mb-0 text-sm font-semibold text-slate-700">
+                        Select Pet {flowType === 'CLINIC' && <span className="text-red-500">*</span>}
+                      </label>
                       <button
                         type="button"
                         onClick={() => setShowQuickRegisterModal(true)}
-                        className="text-xs text-primary-600 hover:underline font-medium"
+                        className="btn btn-secondary btn-sm gap-1 text-xs"
                       >
-                        + Add New Pet
+                        <UserPlusIcon className="h-3.5 w-3.5" /> Add New Pet
                       </button>
                     </div>
-                    <div className="flex flex-wrap gap-2 mt-1">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {pets.map((p) => (
                         <button key={p._id} type="button" onClick={() => setSelectedPet(p)}
-                          className={`px-3.5 py-1.5 rounded-xl text-sm border transition-all ${
+                          className={`p-4 rounded-xl border-2 transition-all duration-200 text-left ${
                             selectedPet?._id === p._id
-                              ? 'bg-primary-600 text-white border-primary-600 font-bold shadow-sm'
-                              : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
+                              ? 'bg-gradient-to-br from-primary-50 to-blue-50 border-primary-500 shadow-md'
+                              : 'bg-white border-slate-200 hover:border-primary-300 hover:shadow-sm'
                           }`}>
-                          {p.species === 'Cat' ? '🐱' : '🐶'} {p.name} <span className="opacity-75 text-xs">({p.species})</span>
+                          <div className="flex items-center gap-3">
+                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl ${
+                              selectedPet?._id === p._id ? 'bg-primary-500 text-white' : 'bg-slate-100'
+                            }`}>
+                              {p.species === 'Cat' ? '🐱' : '🐶'}
+                            </div>
+                            <div className="flex-1">
+                              <p className="font-bold text-slate-800">{p.name}</p>
+                              <p className="text-xs text-slate-500">{p.species} {p.breed && `· ${p.breed}`}</p>
+                              {p.petId && <p className="text-xs text-slate-400 font-mono">ID: {p.petId}</p>}
+                            </div>
+                            {selectedPet?._id === p._id && (
+                              <CheckCircleIcon className="h-5 w-5 text-primary-600" />
+                            )}
+                          </div>
                         </button>
                       ))}
                       {pets.length === 0 && (
-                        <p className="text-xs text-slate-400 italic">No pets found for this client. Click "+ Add New Pet" to add one.</p>
+                        <div className="col-span-2 p-6 bg-slate-50 rounded-xl border-2 border-dashed border-slate-300 text-center">
+                          <div className="w-12 h-12 bg-slate-200 rounded-full flex items-center justify-center mx-auto mb-2">
+                            <span className="text-2xl">🐾</span>
+                          </div>
+                          <p className="text-sm text-slate-500 mb-2">No pets registered for this client</p>
+                          <button
+                            type="button"
+                            onClick={() => setShowQuickRegisterModal(true)}
+                            className="btn btn-primary btn-sm"
+                          >
+                            <UserPlusIcon className="h-4 w-4" /> Add First Pet
+                          </button>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -615,10 +736,10 @@ export default function NewBillPage() {
               </h3>
 
               {/* Product Search */}
-              <div className="relative">
-                <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <div className="relative" ref={productDropdownRef}>
+                <MagnifyingGlassIcon className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
                 <input
-                  className="input pl-9"
+                  className="input pl-11 py-3 text-base shadow-sm"
                   value={productSearch}
                   onChange={(e) => {
                     setProductSearch(e.target.value);
@@ -628,34 +749,61 @@ export default function NewBillPage() {
                     setShowProductDropdown(true);
                     productAPI.search(productSearch).then((r) => setProductResults(r.data.products || []));
                   }}
-                  placeholder="Click to browse or search products by name, code, brand..."
+                  placeholder="🔍 Search products by name, code, or brand..."
                 />
-                {showProductDropdown && productResults.length > 0 && (
-                  <div className="absolute z-20 top-full mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-xl max-h-72 overflow-y-auto">
-                    <div className="p-2 bg-slate-50 border-b text-xs text-slate-500 font-semibold flex justify-between">
-                      <span>{productSearch ? `Search Results (${productResults.length})` : `Available Products (${productResults.length})`}</span>
-                      <button type="button" onClick={() => setShowProductDropdown(false)} className="text-slate-400 hover:text-slate-700">Close ✕</button>
-                    </div>
-                    {productResults.map((p) => {
-                      const expired = p.expiryDate && new Date(p.expiryDate) < new Date();
-                      const outOfStock = p.currentStock === 0;
-                      return (
-                        <button key={p._id} type="button" onClick={() => { addToCart(p); setShowProductDropdown(false); }}
-                          disabled={expired || outOfStock}
-                          className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-50 text-sm border-b last:border-0 disabled:opacity-50 text-left">
-                          <div className="text-left">
-                            <p className="font-medium text-slate-800">{p.name}</p>
-                            <p className="text-xs text-slate-400">{p.productCode} {p.brand ? `· ${p.brand}` : ''} · GST {p.gstRate}%</p>
-                          </div>
-                          <div className="text-right">
-                            <p className="font-bold text-slate-800">{formatCurrency(p.sellingPrice)}</p>
-                            <p className={`text-xs ${outOfStock ? 'text-red-500' : expired ? 'text-red-500' : 'text-slate-500'}`}>
-                              {expired ? 'Expired' : outOfStock ? 'Out of stock' : `Stock: ${p.currentStock}`}
-                            </p>
-                          </div>
+                {showProductDropdown && (
+                  <div className="absolute z-50 top-full mt-2 w-full bg-white border border-slate-200 rounded-2xl shadow-2xl max-h-96 overflow-y-auto">
+                    <div className="sticky top-0 bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-200 p-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-semibold text-slate-700">
+                          {productSearch ? `🔍 Found ${productResults.length} product(s)` : `📦 All Products (${productResults.length})`}
+                        </span>
+                        <button type="button" onClick={() => setShowProductDropdown(false)} className="text-slate-400 hover:text-slate-700 px-2 py-1 rounded-lg hover:bg-slate-200 transition-colors">
+                          <XMarkIcon className="h-4 w-4" />
                         </button>
-                      );
-                    })}
+                      </div>
+                    </div>
+                    {productResults.length === 0 ? (
+                      <div className="p-8 text-center">
+                        <ShoppingBagIcon className="h-12 w-12 text-slate-300 mx-auto mb-2" />
+                        <p className="text-slate-500 text-sm">No products found</p>
+                      </div>
+                    ) : (
+                      productResults.map((p) => {
+                        const expired = p.expiryDate && new Date(p.expiryDate) < new Date();
+                        const outOfStock = p.currentStock === 0;
+                        const lowStock = p.currentStock <= p.reorderLevel && p.currentStock > 0;
+                        return (
+                          <button key={p._id} type="button" onClick={() => { addToCart(p); setShowProductDropdown(false); }}
+                            disabled={expired || outOfStock}
+                            className="w-full flex items-center justify-between px-4 py-4 hover:bg-gradient-to-r hover:from-blue-50 hover:to-transparent text-sm border-b last:border-0 disabled:opacity-50 text-left transition-all duration-200 group">
+                            <div className="flex items-center gap-3">
+                              <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl ${
+                                expired ? 'bg-red-100' : outOfStock ? 'bg-red-100' : lowStock ? 'bg-yellow-100' : 'bg-green-100'
+                              }`}>
+                                {expired ? '❌' : outOfStock ? '🚫' : lowStock ? '⚠️' : '✅'}
+                              </div>
+                              <div className="text-left">
+                                <p className="font-bold text-slate-800 text-base">{p.name}</p>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <span className="badge badge-slate text-xs">{p.productCode}</span>
+                                  {p.brand && <span className="text-xs text-slate-500">{p.brand}</span>}
+                                  <span className="badge badge-blue text-xs">GST {p.gstRate}%</span>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-bold text-slate-800 text-lg">{formatCurrency(p.sellingPrice)}</p>
+                              <p className={`text-xs font-medium ${
+                                expired ? 'text-red-600' : outOfStock ? 'text-red-600' : lowStock ? 'text-yellow-600' : 'text-green-600'
+                              }`}>
+                                {expired ? 'Expired' : outOfStock ? 'Out of Stock' : lowStock ? `Low Stock: ${p.currentStock}` : `Stock: ${p.currentStock}`}
+                              </p>
+                            </div>
+                          </button>
+                        );
+                      })
+                    )}
                   </div>
                 )}
               </div>
