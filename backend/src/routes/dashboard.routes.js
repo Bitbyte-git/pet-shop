@@ -4,6 +4,7 @@ const { protect } = require('../middleware/auth');
 const Client = require('../models/Client');
 const Pet = require('../models/Pet');
 const Product = require('../models/Product');
+const ProductCategory = require('../models/ProductCategory');
 const ProductBilling = require('../models/ProductBilling');
 const ClinicBilling = require('../models/ClinicBilling');
 const InventoryTransaction = require('../models/InventoryTransaction');
@@ -49,6 +50,92 @@ router.get('/admin', async (req, res) => {
   const expiringSoon = products.filter((p) => p.expiryDate && new Date(p.expiryDate) <= ninetyDaysLater && new Date(p.expiryDate) >= now);
   const expired = products.filter((p) => p.expiryDate && new Date(p.expiryDate) < now);
   const totalStockValue = products.reduce((sum, p) => sum + p.currentStock * p.sellingPrice, 0);
+
+  // Sales by category analytics
+  const categories = await ProductCategory.find({ status: 'ACTIVE' });
+  const salesByCategory = await Promise.all(
+    categories.map(async (cat) => {
+      const catProducts = await Product.find({ category: cat._id, status: 'ACTIVE' }).select('_id');
+      const productIds = catProducts.map(p => p._id);
+      
+      const productBills = await ProductBilling.find({
+        'items.product': { $in: productIds },
+        paymentStatus: 'PAID',
+        createdAt: { $gte: startOfDay, $lte: endOfDay }
+      });
+      
+      const totalSales = productBills.reduce((sum, bill) => {
+        const catItems = bill.items.filter(item => productIds.includes(item.product));
+        return sum + catItems.reduce((s, i) => s + (i.quantity * i.rate), 0);
+      }, 0);
+      
+      return {
+        categoryName: cat.name,
+        sales: totalSales
+      };
+    })
+  );
+
+  // Stock distribution by category
+  const stockByCategory = await Promise.all(
+    categories.map(async (cat) => {
+      const catProducts = await Product.find({ category: cat._id, status: 'ACTIVE' });
+      const totalStock = catProducts.reduce((sum, p) => sum + p.currentStock, 0);
+      const totalValue = catProducts.reduce((sum, p) => sum + (p.currentStock * p.sellingPrice), 0);
+      
+      return {
+        categoryName: cat.name,
+        stock: totalStock,
+        value: totalValue
+      };
+    })
+  );
+
+  // 7-day sales trend for admin
+  const salesTrend = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    d.setHours(0, 0, 0, 0);
+    const end = new Date(d);
+    end.setHours(23, 59, 59, 999);
+
+    const [pBills, cBills] = await Promise.all([
+      ProductBilling.find({ createdAt: { $gte: d, $lte: end }, paymentStatus: 'PAID' }),
+      ClinicBilling.find({ createdAt: { $gte: d, $lte: end }, status: 'ACTIVE' }),
+    ]);
+
+    const pSales = pBills.reduce((s, b) => s + b.grandTotal, 0);
+    const cSales = cBills.reduce((s, b) => s + b.totalAmount, 0);
+
+    salesTrend.push({
+      date: d.toISOString().split('T')[0],
+      dayName: d.toLocaleDateString('en-US', { weekday: 'short' }),
+      productSales: pSales,
+      clinicSales: cSales,
+      totalSales: pSales + cSales,
+    });
+  }
+
+  // Top selling products
+  const productSalesMap = {};
+  const recentProductBills = await ProductBilling.find({ paymentStatus: 'PAID' })
+    .sort({ createdAt: -1 })
+    .limit(50);
+  
+  recentProductBills.forEach(bill => {
+    bill.items.forEach(item => {
+      if (!productSalesMap[item.productName]) {
+        productSalesMap[item.productName] = { name: item.productName, quantity: 0, revenue: 0 };
+      }
+      productSalesMap[item.productName].quantity += item.quantity;
+      productSalesMap[item.productName].revenue += item.quantity * item.rate;
+    });
+  });
+  
+  const topSellingProducts = Object.values(productSalesMap)
+    .sort((a, b) => b.revenue - a.revenue)
+    .slice(0, 5);
 
   // Compute activity per Billing Manager
   const bmActivity = await Promise.all(
@@ -104,6 +191,12 @@ router.get('/admin', async (req, res) => {
       expiryDate: p.expiryDate,
       daysUntilExpiry: Math.ceil((new Date(p.expiryDate) - now) / (1000 * 60 * 60 * 24)),
     })),
+    analytics: {
+      salesByCategory,
+      stockByCategory,
+      salesTrend,
+      topSellingProducts,
+    },
   });
 });
 
@@ -129,6 +222,46 @@ router.get('/billing-manager', async (req, res) => {
 
   const lowStock = products.filter((p) => p.currentStock <= p.reorderLevel && p.currentStock > 0);
   const expiring = products.filter((p) => p.expiryDate && new Date(p.expiryDate) <= ninetyDaysLater && new Date(p.expiryDate) >= now);
+
+  // Sales by category for billing manager
+  const categories = await ProductCategory.find({ status: 'ACTIVE' });
+  const salesByCategory = await Promise.all(
+    categories.map(async (cat) => {
+      const catProducts = await Product.find({ category: cat._id, status: 'ACTIVE' }).select('_id');
+      const productIds = catProducts.map(p => p._id);
+      
+      const productBills = await ProductBilling.find({
+        'items.product': { $in: productIds },
+        paymentStatus: 'PAID',
+        createdAt: { $gte: new Date(new Date().setHours(0,0,0,0)) }
+      });
+      
+      const totalSales = productBills.reduce((sum, bill) => {
+        const catItems = bill.items.filter(item => productIds.includes(item.product));
+        return sum + catItems.reduce((s, i) => s + (i.quantity * i.rate), 0);
+      }, 0);
+      
+      return {
+        categoryName: cat.name,
+        sales: totalSales
+      };
+    })
+  );
+
+  // Stock distribution by category
+  const stockByCategory = await Promise.all(
+    categories.map(async (cat) => {
+      const catProducts = await Product.find({ category: cat._id, status: 'ACTIVE' });
+      const totalStock = catProducts.reduce((sum, p) => sum + p.currentStock, 0);
+      const totalValue = catProducts.reduce((sum, p) => sum + (p.currentStock * p.sellingPrice), 0);
+      
+      return {
+        categoryName: cat.name,
+        stock: totalStock,
+        value: totalValue
+      };
+    })
+  );
 
   // Compute 7-day sales trend summary
   const last7Days = [];
@@ -190,6 +323,10 @@ router.get('/billing-manager', async (req, res) => {
       daysUntilExpiry: Math.ceil((new Date(p.expiryDate) - now) / (1000 * 60 * 60 * 24)),
     })),
     salesAnalytics: last7Days,
+    analytics: {
+      salesByCategory,
+      stockByCategory,
+    },
   });
 });
 

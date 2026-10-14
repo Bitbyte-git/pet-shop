@@ -3,6 +3,9 @@ import { Link } from 'react-router-dom';
 import { dashboardAPI } from '../../services/api';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import { formatCurrency, formatDateTime } from '../../utils/helpers';
+import SalesTrendChart from '../../components/charts/SalesTrendChart';
+import SalesByCategoryChart from '../../components/charts/SalesByCategoryChart';
+import StockByCategoryChart from '../../components/charts/StockByCategoryChart';
 import {
   PlusCircleIcon, ReceiptRefundIcon, CurrencyRupeeIcon, ArrowTrendingUpIcon,
   UsersIcon, ShoppingBagIcon, ExclamationTriangleIcon, ClockIcon, BeakerIcon,
@@ -22,7 +25,13 @@ export default function BillingManagerDashboard() {
   if (loading) return <LoadingSpinner />;
   if (!data) return null;
 
-  const { stats, recentBills, lowStockAlerts, expiringProducts, recentTransactions, salesAnalytics } = data;
+  const { stats, recentBills, lowStockAlerts, expiringProducts, recentTransactions, salesAnalytics, analytics } = data;
+  
+  // Ensure analytics exists with defaults
+  const analyticsData = analytics || {
+    salesByCategory: [],
+    stockByCategory: [],
+  };
 
   return (
     <div className="space-y-6">
@@ -128,22 +137,38 @@ export default function BillingManagerDashboard() {
         </div>
       </div>
 
-      {/* Sales Analytics Chart/Breakdown */}
-      {salesAnalytics && salesAnalytics.length > 0 && (
-        <div className="card card-body">
-          <h3 className="font-bold text-slate-800 mb-3">7-Day Sales Analytics</h3>
-          <div className="grid grid-cols-7 gap-2 pt-2">
-            {salesAnalytics.map((day, idx) => (
-              <div key={idx} className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-center space-y-1">
-                <p className="text-xs font-bold text-slate-600">{day.dayName}</p>
-                <p className="text-xs text-slate-400">{day.date.slice(5)}</p>
-                <p className="text-sm font-bold text-emerald-700 mt-1">{formatCurrency(day.totalSales)}</p>
-                <p className="text-[10px] text-slate-500">{day.count} bills</p>
-              </div>
-            ))}
+      {/* Analytics Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Sales Trend Chart */}
+        <div className="card">
+          <div className="card-header">
+            <h3 className="font-semibold text-slate-800">7-Day Sales Trend</h3>
+          </div>
+          <div className="card-body">
+            <SalesTrendChart data={salesAnalytics || []} />
           </div>
         </div>
-      )}
+
+        {/* Sales by Category */}
+        <div className="card">
+          <div className="card-header">
+            <h3 className="font-semibold text-slate-800">Sales by Category (Today)</h3>
+          </div>
+          <div className="card-body">
+            <SalesByCategoryChart data={analyticsData.salesByCategory} />
+          </div>
+        </div>
+
+        {/* Stock by Category */}
+        <div className="card">
+          <div className="card-header">
+            <h3 className="font-semibold text-slate-800">Stock Distribution by Category</h3>
+          </div>
+          <div className="card-body">
+            <StockByCategoryChart data={analyticsData.stockByCategory} />
+          </div>
+        </div>
+      </div>
 
       {/* Tables Row: Recent Bills & Inventory Alerts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

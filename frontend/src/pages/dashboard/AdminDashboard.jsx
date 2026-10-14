@@ -3,6 +3,10 @@ import { Link } from 'react-router-dom';
 import { dashboardAPI } from '../../services/api';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import { formatCurrency, formatDateTime } from '../../utils/helpers';
+import SalesTrendChart from '../../components/charts/SalesTrendChart';
+import SalesByCategoryChart from '../../components/charts/SalesByCategoryChart';
+import StockByCategoryChart from '../../components/charts/StockByCategoryChart';
+import TopSellingProductsChart from '../../components/charts/TopSellingProductsChart';
 import {
   UsersIcon, HeartIcon, CubeIcon, CurrencyRupeeIcon,
   ExclamationTriangleIcon, ReceiptRefundIcon, ArrowTrendingUpIcon,
@@ -38,7 +42,15 @@ export default function AdminDashboard() {
   if (loading) return <LoadingSpinner />;
   if (!data) return null;
 
-  const { stats, recentClients, recentBills, bmActivity, lowStockProducts, expiringSoonProducts } = data;
+  const { stats, recentClients, recentBills, bmActivity, lowStockProducts, expiringSoonProducts, analytics } = data;
+  
+  // Ensure analytics exists with defaults
+  const analyticsData = analytics || {
+    salesByCategory: [],
+    stockByCategory: [],
+    salesTrend: [],
+    topSellingProducts: [],
+  };
 
   return (
     <div className="space-y-6">
@@ -71,6 +83,49 @@ export default function AdminDashboard() {
         <StatCard icon={ArrowTrendingUpIcon} iconBg="bg-emerald-600" value={formatCurrency(stats.todaySales)} label="Today's Gross Sales" sub="Product + Clinic Total" />
         <StatCard icon={ReceiptRefundIcon} iconBg="bg-blue-600" value={formatCurrency(stats.todayProductSales)} label="Product Shop Sales" sub="Customer invoices with GST" />
         <StatCard icon={BeakerIcon} iconBg="bg-amber-600" value={formatCurrency(stats.todayClinicSales)} label="Clinic Treatment Sales" sub="Internal records (NO GST)" />
+      </div>
+
+      {/* Analytics Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Sales Trend Chart */}
+        <div className="card">
+          <div className="card-header">
+            <h3 className="font-semibold text-slate-800">7-Day Sales Trend</h3>
+          </div>
+          <div className="card-body">
+            <SalesTrendChart data={analyticsData.salesTrend} />
+          </div>
+        </div>
+
+        {/* Sales by Category */}
+        <div className="card">
+          <div className="card-header">
+            <h3 className="font-semibold text-slate-800">Sales by Category (Today)</h3>
+          </div>
+          <div className="card-body">
+            <SalesByCategoryChart data={analyticsData.salesByCategory} />
+          </div>
+        </div>
+
+        {/* Stock by Category */}
+        <div className="card">
+          <div className="card-header">
+            <h3 className="font-semibold text-slate-800">Stock Distribution by Category</h3>
+          </div>
+          <div className="card-body">
+            <StockByCategoryChart data={analyticsData.stockByCategory} />
+          </div>
+        </div>
+
+        {/* Top Selling Products */}
+        <div className="card">
+          <div className="card-header">
+            <h3 className="font-semibold text-slate-800">Top Selling Products</h3>
+          </div>
+          <div className="card-body">
+            <TopSellingProductsChart data={analyticsData.topSellingProducts} />
+          </div>
+        </div>
       </div>
 
       {/* Billing Manager Activity Monitoring */}

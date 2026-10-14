@@ -84,19 +84,19 @@ export default function AdminLayout({ children }) {
   };
 
   const Sidebar = () => (
-    <div className={`flex flex-col h-full bg-navy-900 transition-all duration-300 ${collapsed ? 'w-16' : 'w-64'}`}>
+    <div className={`flex flex-col h-full bg-gradient-to-b from-navy-900 via-navy-800 to-navy-900 transition-all duration-300 ${collapsed ? 'w-16' : 'w-64'} shadow-2xl`}>
       {/* Logo */}
-      <div className="flex items-center gap-3 px-4 py-5 border-b border-white/10">
-        <div className="w-9 h-9 bg-primary-500 rounded-xl flex items-center justify-center flex-shrink-0">
-          <span className="text-white font-black text-lg">🐾</span>
+      <div className="flex items-center gap-3 px-4 py-5 border-b border-white/10 bg-gradient-to-r from-primary-600/20 to-transparent">
+        <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-600 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg shadow-primary-500/30">
+          <span className="text-white font-black text-xl">🐾</span>
         </div>
         {!collapsed && (
           <div>
             <p className="text-white font-bold text-sm leading-tight">Paws & Care</p>
-            <p className="text-primary-300 text-xs">Pet Clinic</p>
+            <p className="text-primary-300 text-xs font-medium">Pet Clinic Management</p>
           </div>
         )}
-        <button onClick={() => setCollapsed(!collapsed)} className="ml-auto text-slate-400 hover:text-white hidden lg:block">
+        <button onClick={() => setCollapsed(!collapsed)} className="ml-auto text-slate-400 hover:text-white transition-colors hidden lg:block p-1.5 rounded-lg hover:bg-white/10">
           <Bars3Icon className="h-5 w-5" />
         </button>
       </div>
@@ -104,37 +104,37 @@ export default function AdminLayout({ children }) {
       {/* Role badge */}
       {!collapsed && (
         <div className="mx-3 mt-3 mb-1">
-          <div className="flex items-center gap-2 bg-primary-700/30 rounded-lg px-3 py-2">
+          <div className="flex items-center gap-2 bg-gradient-to-r from-primary-600/30 to-primary-700/30 rounded-xl px-3 py-2.5 border border-primary-500/30 shadow-inner">
             <ShieldCheckIcon className="h-4 w-4 text-primary-300" />
-            <span className="text-primary-200 text-xs font-medium">Administrator</span>
+            <span className="text-primary-200 text-xs font-semibold">Administrator</span>
           </div>
         </div>
       )}
 
       {/* Nav */}
-      <nav className="flex-1 overflow-y-auto scrollbar-thin px-3 py-3 space-y-0.5">
+      <nav className="flex-1 overflow-y-auto scrollbar-thin px-3 py-3 space-y-1">
         {navItems.map((item, i) => (
           <NavItem key={i} item={item} collapsed={collapsed} />
         ))}
       </nav>
 
       {/* User footer */}
-      <div className="border-t border-white/10 p-3">
+      <div className="border-t border-white/10 p-3 bg-gradient-to-t from-black/20 to-transparent">
         {!collapsed ? (
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center flex-shrink-0">
+          <div className="flex items-center gap-3 p-2 rounded-xl hover:bg-white/5 transition-colors">
+            <div className="w-9 h-9 bg-gradient-to-br from-primary-500 to-primary-600 rounded-full flex items-center justify-center flex-shrink-0 shadow-lg">
               <span className="text-white text-xs font-bold">{user?.name?.[0]?.toUpperCase()}</span>
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-white text-xs font-semibold truncate">{user?.name}</p>
               <p className="text-slate-400 text-xs truncate">{user?.email}</p>
             </div>
-            <button onClick={handleLogout} className="text-slate-400 hover:text-red-400 transition-colors">
+            <button onClick={handleLogout} className="text-slate-400 hover:text-red-400 transition-colors p-1.5 rounded-lg hover:bg-red-500/10">
               <ArrowRightOnRectangleIcon className="h-5 w-5" />
             </button>
           </div>
         ) : (
-          <button onClick={handleLogout} className="w-full flex justify-center text-slate-400 hover:text-red-400">
+          <button onClick={handleLogout} className="w-full flex justify-center text-slate-400 hover:text-red-400 p-2 rounded-xl hover:bg-red-500/10 transition-colors">
             <ArrowRightOnRectangleIcon className="h-5 w-5" />
           </button>
         )}
@@ -143,7 +143,7 @@ export default function AdminLayout({ children }) {
   );
 
   return (
-    <div className="flex h-screen bg-slate-100 overflow-hidden">
+    <div className="flex h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-50 overflow-hidden">
       {/* Desktop sidebar */}
       <div className="hidden lg:flex h-full flex-shrink-0">
         <Sidebar />
@@ -152,7 +152,7 @@ export default function AdminLayout({ children }) {
       {/* Mobile sidebar overlay */}
       {mobileOpen && (
         <div className="fixed inset-0 z-40 lg:hidden">
-          <div className="absolute inset-0 bg-black/60" onClick={() => setMobileOpen(false)} />
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
           <div className="absolute left-0 top-0 h-full w-64 z-10">
             <Sidebar />
           </div>
@@ -162,25 +162,31 @@ export default function AdminLayout({ children }) {
       {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Top bar */}
-        <header className="bg-white border-b border-slate-200 px-4 py-3 flex items-center gap-4 flex-shrink-0">
+        <header className="bg-white/80 backdrop-blur-xl border-b border-slate-200/60 px-4 py-3 flex items-center gap-4 flex-shrink-0 shadow-sm">
           <button onClick={() => setMobileOpen(true)} className="lg:hidden btn btn-secondary btn-sm">
             <Bars3Icon className="h-5 w-5" />
           </button>
           <div className="flex-1" />
-          <button className="btn btn-secondary btn-sm relative">
+          <button className="btn btn-secondary btn-sm relative hover:bg-slate-100">
             <BellIcon className="h-5 w-5 text-slate-500" />
+            <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-[10px] text-white flex items-center justify-center">3</span>
           </button>
-          <div className="flex items-center gap-2 text-sm text-slate-600">
-            <div className="w-7 h-7 bg-primary-600 rounded-full flex items-center justify-center">
+          <div className="flex items-center gap-3 text-sm">
+            <div className="w-9 h-9 bg-gradient-to-br from-primary-500 to-primary-600 rounded-full flex items-center justify-center shadow-lg">
               <span className="text-white text-xs font-bold">{user?.name?.[0]?.toUpperCase()}</span>
             </div>
-            <span className="font-medium hidden sm:block">{user?.name}</span>
+            <div className="hidden sm:block">
+              <p className="font-semibold text-slate-800">{user?.name}</p>
+              <p className="text-xs text-slate-500">Administrator</p>
+            </div>
           </div>
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto p-6">
-          {children}
+        <main className="flex-1 overflow-y-auto p-6 lg:p-8">
+          <div className="max-w-7xl mx-auto animate-fade-in-up">
+            {children}
+          </div>
         </main>
       </div>
     </div>
